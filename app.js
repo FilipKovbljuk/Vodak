@@ -1,205 +1,213 @@
-from flask import Flask, render_template, request
-
-app = Flask(__name__, static_url_path='/static', static_folder='static', template_folder='templates')
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    return render_template('prvni_stranka.html'), 200
-
-
-@app.route('/druha_stranka', methods=['GET', 'POST'])
-def druha_stranka():
-    return render_template('druha_stranka.html', zprava="Tajná zpráva.."), 200
+const express = require('express');
+const ejs = require('ejs');
+const path = require('path');
+const app = express();
+const port = 80;
+const fs = require('fs');
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
-"""
 
-from crypt import methods
-import re
-from flask import Flask, flash, jsonify, render_template, request
+// Nastavenďż˝ view engine pro EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-app = Flask(__name__, static_url_path='/static', static_folder='static', template_folder='templates')
+// Seznam existujďż˝cďż˝ch jmen
+const existingNicknames = ['adam', 'eva', 'john']; // Mďż˝ďż˝ete sem vloďż˝it existujďż˝cďż˝ jmďż˝na nebo naďż˝ďż˝st z externďż˝ho zdroje
 
-registrations = []
-students = []
-pattern = "^[a-zA-Z0-9_-]{2,20}$"
+// Importovďż˝nďż˝ knihovny pro middleware
+const bodyParser = require('body-parser');
 
-
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html', registrations=registrations, students=students)
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    return render_template('signup.html', students=students)
+app.get('/', (req, res) => {
+    res.render('index', { registry: registry }); // Poslat promďż˝nnou `registry` do ďż˝ablony `index`
+});
+
+app.get('/login', (req, res) => {
+    res.render('login'); // Upravte na sprďż˝vnou cestu k vaďż˝emu souboru pro pďż˝ihlďż˝enďż˝
+});
+
+app.get('/registrace', (req, res) => {
+    try {
+        const data = fs.readFileSync('registrations.json', 'utf8');
+        const registeredUsers = JSON.parse(data);
+        res.render('registrace', { registeredUsers: registeredUsers });
+    } catch (err) {
+        console.error('Chyba pri cteni souboru:', err);
+        res.status(500).send('Chyba pri cteni souboru.');
+    }
+});
+
+app.get('/contact', (req, res) => {
+    res.render('contact'); // pďż˝izpďż˝sobte podle vaďż˝ďż˝ struktury a nďż˝zvu souboru
+});
 
 
-@app.route('/admin', methods=['GET'])
-def admin():
-    return render_template('admin.html', registrations=registrations, students=students)
+function writeToJSONFile(data) {
+    const jsonData = JSON.stringify(data, null, 2); // Konvertovďż˝nďż˝ dat na JSON
+    fs.writeFile('registrations.json', jsonData, 'utf8', (err) => {
+        if (err) {
+            console.error('Chyba pri zapisu do souboru:', err);
+            return;
+        }
+        console.log('Data zapsana do souboru "registrations.json"');
+    });
+}
+
+let registry = [];
 
 
-@app.route('/reg', methods=['POST'])
-def reg():
-    name = request.form['name']
-    nickname = request.form['nickname']
-    surname = request.form['surname']
-    canSwim = request.form['canSwim']
 
-    # Kontrola dat z formuláře
-    if not name:
-        return jsonify({'status': 'error', 'message': 'Zadej své jméno'}), 400
+function validateNickname(nickname) {
+    const nicknameRegex = /^[A-Za-z0-9]{2,20}$/;
+    return nicknameRegex.test(nickname);
+}
 
-    # nick musí obsahovat pouze znaky anglické abecedy, číslice a velikost mezi 2 až 20 znaků
-    elif not re.match(pattern, name):
-        return jsonify({'status': 'error',
-                        'message': 'Jméno musí obsahovat pouze znaky anglické abecedy, číslice a velikost mezi 2 až 20 znaků'}), 400
+app.post('/submitRegistration', (req, res) => {
+    const { name, nick, is_swimmer, canoe_companion, email } = req.body;
 
-    elif not nickname:
-        return jsonify({'status': 'error', 'message': 'Zadej svůj nick'}), 400
+    if (!nick || !is_swimmer || !email) {
+        return res.status(400).send('Chybejici informace ve formulari.');
+    }
 
-    elif not re.match(pattern, nickname):
-        return jsonify({'status': 'error',
-                        'message': 'Nick musí obsahovat pouze znaky anglické abecedy, číslice a velikost mezi 2 až 20 znaků'}), 400
+    if (is_swimmer !== '1') {
+        return res.status(400).send('Osoba musi umet plavat.');
+    }
 
-    elif not surname:
-        return jsonify({'status': 'error', 'message': 'Zadej své příjmení'}), 400
+    const isNickValid = validateNickname(nick);
+    if (!isNickValid) {
+        return res.status(400).send('Neplatna prezdivka (nick).');
+    }
 
-    elif not re.match(pattern, surname):
-        return jsonify({'status': 'error',
-                        'message': 'Příjmení musí obsahovat pouze znaky anglické abecedy, číslice a velikost mezi 2 až 20 znaků'}), 400
+    if (canoe_companion) {
+        const isCompanionValid = validateNickname(canoe_companion);
+        if (!isCompanionValid) {
+            return res.status(400).send('Neplatny spolecnik na lodi (kanoe_kamarad).');
+        }
+    }
 
-    elif canSwim == '0':
-        return jsonify({'status': 'error', 'message': 'Musíš být plavec, abys mohl jet na vodácký kurz'}), 400
+    const isEmailDuplicate = isDuplicateValue(email, 'email');
+    if (isEmailDuplicate) {
+        return res.status(400).send('E-mailova adresa jiz existuje.');
+    }
 
-    for student in students:
-        if student['nickname'] == nickname:
-            return jsonify({'status': 'error', 'message': 'Tento student je již registrován'}), 400
+    const registration = {
+        name: name,
+        nick: nick,
+        is_swimmer: is_swimmer,
+        canoe_companion: canoe_companion || "",
+        email: email
+    };
 
-    else:
-        students.append({
-            'id': len(students),
-            'name': name,
-            'nickname': nickname,
-            'surname': surname})
-        return jsonify({'status': 'success', 'message': 'Registrace byla úspéšně odeslána'}), 201
+appendToJSONFile(registration); // Pďż˝idďż˝nďż˝ novďż˝ registrace do JSON souboru
 
+    registry.push(registration);
+	
+	// Zďż˝pis registracďż˝ do JSON souboru
+    writeToJSONFile(registry);
 
-@app.route('/seats', methods=['POST'])
-def seats():
-    student1_nickname = request.form['student1']
-    student2_nickname = request.form['student2']
-
-    if not student1_nickname:
-        return jsonify({'status': 'error', 'message': 'Vyber prvního studenta'}), 400
-
-    elif not student2_nickname:
-        return jsonify({'status': 'error', 'message': 'Vyber druhého studenta'}), 400
-
-    elif student1_nickname == student2_nickname:
-        return jsonify({'status': 'error', 'message': 'Vyber dva různé studenty'}), 400
-
-    for registration in registrations:
-        if registration['student1_nickname'] == student1_nickname and registration[
-            'student2_nickname'] == student2_nickname:
-            return jsonify({'status': 'error', 'message': 'Tito studenti jsou již spolu na kurzu'}), 400
-
-    for registration in registrations:
-        if registration['student1_nickname'] == student1_nickname or registration[
-            'student2_nickname'] == student1_nickname:
-            return jsonify({'status': 'error', 'message': 'Tento student je již na kurzu'}), 400
-
-        elif registration['student1_nickname'] == student2_nickname or registration[
-            'student2_nickname'] == student2_nickname:
-            return jsonify({'status': 'error', 'message': 'Tento student je již na kurzu'}), 400
-
-    else:
-        registrations.append({
-            'id': len(registrations),
-            'student1_nickname': student1_nickname,
-            'student1_name': [student['name'] for student in students if student['nickname'] == student1_nickname][0],
-            'student1_surname':
-                [student['surname'] for student in students if student['nickname'] == student1_nickname][0],
-            'student2_nickname': student2_nickname,
-            'student2_name': [student['name'] for student in students if student['nickname'] == student2_nickname][0],
-            'student2_surname':
-                [student['surname'] for student in students if student['nickname'] == student2_nickname][0]
-        })
-        return jsonify({'status': 'success', 'message': 'Registrace na vodácký kurz byla úspéšně odeslána'}), 201
+	 res.render('index');
+});
 
 
-@app.route('/admin/delete/student', methods=['POST'])
-def admin_delete_student():
-    nickname = request.form['nickname']
+// Funkce pro kontrolu duplicit v registraďż˝nďż˝ch datech
+function isDuplicateValue(value, property) {
+    const duplicate = registry.some(entry => entry[property] === value);
+    return duplicate;
+}
+// Upravte app.js - Pďż˝idďż˝nďż˝ novďż˝ho endpointu pro kontrolu nickname
 
-    if not nickname:
-        return jsonify({'status': 'error', 'message': 'Nastala chyba'}), 400
+// Novďż˝ endpoint pro kontrolu nickname
+app.get('/api/check-nickname', (req, res) => {
+    const { nick } = req.query;
+    const lowercaseNick = nick.toLowerCase(); // Pďż˝evede zadanďż˝ jmďż˝no na malďż˝ pďż˝smena
 
-    for student in students:
-        if student['nickname'] == nickname:
-            students.remove(student)
-            return jsonify({'status': 'success', 'message': 'Student byl úspěšně smazán'}), 201
+    fs.readFile('registrations.json', 'utf8', (err, data) => {
+        if (err) {
+            console.error('Chyba pri cteni souboru:', err);
+            return res.status(500).send('Chyba pri cteni souboru.');
+        }
 
-    else:
-        return jsonify({'status': 'error', 'message': 'Student nebyl nalezen'}), 400
+        const registrations = JSON.parse(data);
+        const existingNicknames = registrations.map(entry => entry.nick.toLowerCase());
 
+        if (existingNicknames.includes(lowercaseNick)) {
+            res.json({ exists: true });
+        } else {
+            res.json({ exists: false });
+        }
+    });
+});
 
-@app.route('/admin/delete/seating', methods=['POST'])
-def admin_delete_seating():
-    student1_nickname = request.form['student1_nickname']
-    student2_nickname = request.form['student2_nickname']
+// Zde by mďż˝lo bďż˝t mďż˝sto, kde inicializujete svďż˝j server a nastavujete routovďż˝nďż˝
 
-    if not student1_nickname:
-        return jsonify({'status': 'error', 'message': 'Nastala chyba'}), 400
+app.get('/api/check-email', (req, res) => {
+    const { email } = req.query;
+    const lowercaseEmail = email .toLowerCase(); // Pďż˝evede zadany email na malďż˝ pďż˝smena
 
-    elif not student2_nickname:
-        return jsonify({'status': 'error', 'message': 'Nastala chyba'}), 400
+    // Proveďż˝te ovďż˝ďż˝enďż˝ existence e-mailu v databďż˝zi zde
+    // Napďż˝ďż˝klad kontrola v JSON souboru nebo pďż˝ďż˝stup k databďż˝zi
 
-    for registration in registrations:
-        if registration['student1_nickname'] == student1_nickname and registration[
-            'student2_nickname'] == student2_nickname:
-            registrations.remove(registration)
-            return jsonify({'status': 'success', 'message': 'Registrace byla úspěšně smazána'}), 201
+    // Upravte tuto logiku podle vaďż˝ich skuteďż˝nďż˝ch dat
+   fs.readFile('registrations.json', 'utf8', (err, data) => {
+        if (err) {
+            console.error('Chyba pri cteni souboru:', err);
+            return res.status(500).send('Chyba pĹ™i cteni souboru.');
+        }
 
-    else:
-        return jsonify({'status': 'error', 'message': 'Registrace nebyla nalezena'}), 400
+        const registrations = JSON.parse(data);
+        const existingEmails= registrations.map(entry => entry.email.toLowerCase());
 
-
-@app.route('/admin/mock', methods=['POST'])
-def admin_mock():
-    registrations.clear()
-    students.clear()
-
-    students.append({'id': 0, 'name': 'Jan', 'nickname': 'Janek', 'surname': 'Novák'})
-    students.append({'id': 1, 'name': 'Petr', 'nickname': 'Petr', 'surname': 'Novák'})
-    students.append({'id': 2, 'name': 'Karel', 'nickname': 'Karel', 'surname': 'Novák'})
-    students.append({'id': 3, 'name': 'Jana', 'nickname': 'Jana', 'surname': 'Nováková'})
-
-    registrations.append({
-        'id': 0,
-        'student1_nickname': 'Janek',
-        'student1_name': 'Jan',
-        'student1_surname': 'Novák',
-        'student2_nickname': 'Petr',
-        'student2_name': 'Petr',
-        'student2_surname': 'Novák'
-    })
-
-    registrations.append({
-        'id': 1,
-        'student1_nickname': 'Karel',
-        'student1_name': 'Karel',
-        'student1_surname': 'Novák',
-        'student2_nickname': 'Jana',
-        'student2_name': 'Jana',
-        'student2_surname': 'Nováková'
-    })
-
-    return jsonify({'status': 'success', 'message': 'Data byla úspěšně načtena'}), 201
+    if (existingEmails.includes(email)) {
+        res.json({ exists: true });
+    } else {
+        res.json({ exists: false });
+    }
+});
+});
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+
+
+
+
+
+// Zmďż˝na zpďż˝sobu uklďż˝dďż˝nďż˝ registracďż˝ do JSON souboru
+function appendToJSONFile(data) {
+    fs.readFile('registrations.json', 'utf8', (err, fileData) => {
+        if (err) {
+            console.error('Chyba pĹ™i ÄŤtenĂ­ souboru:', err);
+            return;
+        }
+
+        let registrations = JSON.parse(fileData);
+
+        // Kontrola, zda novĂˇ registrace jiĹľ existuje v souboru
+        const isDuplicate = registrations.some(entry => entry.nick === data.nick && entry.email === data.email);
+        if (isDuplicate) {
+            console.log('DuplicitnĂ­ zaznam, neni potĹ™eba pridavat.');
+            return;
+        }
+
+        registrations.push(data);
+
+        const jsonData = JSON.stringify(registrations, null, 2);
+
+        fs.writeFile('registrations.json', jsonData, 'utf8', (err) => {
+            if (err) {
+                console.error('Chyba pri zapisu do souboru:', err);
+                return;
+            }
+            console.log('Data uspesne zapsana do souboru "registrations.json"');
+        });
+    });
+}
+
+
+// Spuďż˝tďż˝nďż˝ serveru
+app.listen(port, () => {
+    console.log(`Server bďż˝ďż˝ na adrese http://localhost:${port}`);
+});
