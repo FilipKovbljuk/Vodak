@@ -47,6 +47,7 @@ app.get('/contact', (req, res) => {
 
 
 function writeToJSONFile(data) {
+    /** Saves data to registrations.json  */
     const jsonData = JSON.stringify(data, null, 2); // Konvertovďż˝nďż˝ dat na JSON
     fs.writeFile('registrations.json', jsonData, 'utf8', (err) => {
         if (err) {
@@ -62,6 +63,7 @@ let registry = [];
 
 
 function validateNickname(nickname) {
+    /** Method that validates nickname variable */
     const nicknameRegex = /^[A-Za-z0-9]{2,20}$/;
     return nicknameRegex.test(nickname);
 }
@@ -115,6 +117,7 @@ appendToJSONFile(registration); // Pďż˝idďż˝nďż˝ novďż˝ registrace d
 
 // Funkce pro kontrolu duplicit v registraďż˝nďż˝ch datech
 function isDuplicateValue(value, property) {
+    /** Checks for redundant data */
     const duplicate = registry.some(entry => entry[property] === value);
     return duplicate;
 }
@@ -177,6 +180,7 @@ app.get('/api/check-email', (req, res) => {
 
 // Zmďż˝na zpďż˝sobu uklďż˝dďż˝nďż˝ registracďż˝ do JSON souboru
 function appendToJSONFile(data) {
+    /** Reads data from registrations.json and saves them to registrations variable */
     fs.readFile('registrations.json', 'utf8', (err, fileData) => {
         if (err) {
             console.error('Chyba pĹ™i ÄŤtenĂ­ souboru:', err);
